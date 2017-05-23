@@ -82,8 +82,6 @@ class Container(object):
     def get_ipv4_addresses(self):
         if 'local-address' in self.conf:
             local_addr = self.conf['local-address']
-            if '/' in local_addr:
-                local_addr = local_addr.split('/')[0]
             return [local_addr]
         raise NotImplementedError()
 

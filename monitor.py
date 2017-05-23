@@ -32,9 +32,9 @@ class Monitor(GoBGP):
                 'router-id': conf['monitor']['router-id'],
             },
         }
-        config ['neighbors'] = [{'config': {'neighbor-address': conf['target']['local-address'].split('/')[0],
+        config ['neighbors'] = [{'config': {'neighbor-address': conf['target']['local-address'],
                                             'peer-as': conf['target']['as']},
-                                 'transport': {'config': {'local-address': conf['monitor']['local-address'].split('/')[0]}},
+                                 'transport': {'config': {'local-address': conf['monitor']['local-address']}},
                                  'timers': {'config': {'connect-retry': 10}}}]
         with open('{0}/{1}'.format(self.host_dir, 'gobgpd.conf'), 'w') as f:
             f.write(yaml.dump(config))

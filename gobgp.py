@@ -92,8 +92,8 @@ RUN go install github.com/osrg/gobgp/gobgp
 
 
         def gen_neighbor_config(n):
-            c = {'config': {'neighbor-address': n['local-address'].split('/')[0], 'peer-as': n['as']},
-                 'transport': {'config': {'local-address': conf['target']['local-address'].split('/')[0]}},
+            c = {'config': {'neighbor-address': n['local-address'], 'peer-as': n['as']},
+                 'transport': {'config': {'local-address': conf['target']['local-address']}},
                  'route-server': {'config': {'route-server-client': True}}}
             if 'filter' in n:
                 a = {}

@@ -26,7 +26,7 @@ class Tester(ExaBGP):
         res = []
         peers = self.conf.get('tester', {}).values()
         for p in peers:
-            res.append(p['local-address'].split('/')[0])
+            res.append(p['local-address'])
         return res
 
     def run(self, conf, target, brname=''):
@@ -39,14 +39,14 @@ ulimit -n 65536''']
 
         for p in peers:
             with open('{0}/{1}.conf'.format(self.host_dir, p['router-id']), 'w') as f:
-                local_address = p['local-address'].split('/')[0]
+                local_address = p['local-address']
                 config = '''neighbor {0} {{
     peer-as {1};
     router-id {2};
     local-address {3};
     local-as {4};
     static {{
-'''.format(target['local-address'].split('/')[0], target['as'],
+'''.format(target['local-address'], target['as'],
                p['router-id'], local_address, p['as'])
                 f.write(config)
                 for path in p['paths']:

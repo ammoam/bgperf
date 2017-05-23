@@ -78,7 +78,7 @@ protocol pipe pipe_{0} {{
     export all;
     rs client;
 }}
-'''.format(n['as'], conf['target']['as'], n['local-address'].split('/')[0], 'secondary' if conf['target']['single-table'] else 'table table_{0}'.format(n['as']))
+'''.format(n['as'], conf['target']['as'], n['local-address'], 'secondary' if conf['target']['single-table'] else 'table table_{0}'.format(n['as']))
             return n1 + n2
 
         def gen_prefix_filter(name, match):

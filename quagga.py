@@ -46,7 +46,7 @@ bgp router-id {1}
 """.format(conf['target']['as'], conf['target']['router-id'])
 
         def gen_neighbor_config(n):
-            local_addr = n['local-address'].split('/')[0]
+            local_addr = n['local-address']
             c = """neighbor {0} remote-as {1}
 neighbor {0} advertisement-interval 1
 neighbor {0} route-server-client

@@ -65,7 +65,7 @@ gobgpd -t yaml -f {1}/{2} -l {3} > {1}/gobgpd.log 2>&1
 
         config['neighbors'] = [{
             'config': {
-                'neighbor-address': target['local-address'].split('/')[0],
+                'neighbor-address': target['local-address'],
                 'peer-as': target['as'],
             },
         }]

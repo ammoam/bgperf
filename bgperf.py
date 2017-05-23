@@ -166,7 +166,7 @@ def bench(args):
     is_remote = True if 'remote' in conf['target'] and conf['target']['remote'] else False
 
     if is_remote:
-        r = ip.get_routes(dst=conf['target']['local-address'].split('/')[0], family=AF_INET)
+        r = ip.get_routes(dst=conf['target']['local-address'], family=AF_INET)
         if len(r) == 0:
             print 'no route to remote target {0}'.format(conf['target']['local-address'])
             sys.exit(1)
@@ -196,7 +196,7 @@ def bench(args):
     time.sleep(1)
 
     print 'waiting bgp connection between {0} and monitor'.format(args.target)
-    m.wait_established(conf['target']['local-address'].split('/')[0])
+    m.wait_established(conf['target']['local-address'])
 
     if not args.repeat:
         print 'run tester'
@@ -275,11 +275,33 @@ def gen_conf(args):
     community_list = args.community_list_num
     ext_community_list = args.ext_community_list_num
 
+    local_address_prefix = netaddr.IPNetwork(args.local_address_prefix)
+
+    if args.target_local_address:
+        target_local_address = netaddr.IPAddress(args.target_local_address)
+    else:
+        target_local_address = local_address_prefix.broadcast - 1
+
+    if args.monitor_local_address:
+        monitor_local_address = netaddr.IPAddress(args.monitor_local_address)
+    else:
+        monitor_local_address = local_address_prefix.ip + 2
+
+    if args.target_router_id:
+        target_router_id = netaddr.IPAddress(args.target_router_id)
+    else:
+        target_router_id = target_local_address
+
+    if args.monitor_router_id:
+        monitor_router_id = netaddr.IPAddress(args.monitor_router_id)
+    else:
+        monitor_router_id = monitor_local_address
+
     conf = {}
     conf['target'] = {
         'as': 1000,
-        'router-id': '10.10.0.1',
-        'local-address': '10.10.0.1/16',
+        'router-id': str(target_router_id),
+        'local-address': str(target_local_address),
         'single-table': args.single_table,
     }
 
@@ -288,8 +310,8 @@ def gen_conf(args):
 
     conf['monitor'] = {
         'as': 1001,
-        'router-id': '10.10.0.2',
-        'local-address': '10.10.0.2/16',
+        'router-id': str(monitor_router_id),
+        'local-address': str(monitor_local_address),
         'check-points': [prefix * neighbor],
     }
 
@@ -342,17 +364,26 @@ def gen_conf(args):
         assignment.append(name)
 
     tester = {}
-    for i in range(3, neighbor+3):
-        router_id = '10.10.{0}.{1}'.format(i/255, i%255)
+    configured_tester_cnt = 0
+    for i in range(3, neighbor+3+2):
+        if configured_tester_cnt == neighbor:
+            break
+        curr_ip = local_address_prefix.ip + i
+        if curr_ip in [target_local_address, monitor_local_address]:
+            print('skipping tester with IP {} because it collides with target or monitor'.format(curr_ip))
+            continue
+        router_id = str(local_address_prefix.ip + i)
         tester[router_id] = {
             'as': 1000 + i,
             'router-id': router_id,
-            'local-address': router_id + '/16',
+            'local-address': router_id,
             'paths': '${{gen_paths({0})}}'.format(prefix),
             'filter': {
                 args.filter_type: assignment,
             },
         }
+        configured_tester_cnt += 1
+
     conf['testers'] = [{
         'name': 'tester',
         'type': 'normal',
@@ -398,6 +429,18 @@ if __name__ == '__main__':
         parser.add_argument('-s', '--single-table', action='store_true')
         parser.add_argument('--target-config-file', type=str,
                             help='target BGP daemon\'s configuration file')
+        parser.add_argument('--local-address-prefix', type=str, default='10.10.0.0/16',
+                            help='IPv4 prefix used for local addresses; default: 10.10.0.0/16')
+        parser.add_argument('--target-local-address', type=str,
+                            help='IPv4 address of the target; default: the last address of the '
+                                 'local prefix given in --local-address-prefix')
+        parser.add_argument('--target-router-id', type=str,
+                            help='target\' router ID; default: same as --target-local-address')
+        parser.add_argument('--monitor-local-address', type=str,
+                            help='IPv4 address of the monitor; default: the second address of the '
+                                 'local prefix given in --local-address-prefix')
+        parser.add_argument('--monitor-router-id', type=str,
+                            help='monitor\' router ID; default: same as --monitor-local-address')
 
     parser_bench = s.add_parser('bench', help='run benchmarks')
     parser_bench.add_argument('-t', '--target', choices=['gobgp', 'bird', 'quagga'], default='gobgp')
