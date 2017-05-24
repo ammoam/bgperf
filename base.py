@@ -104,6 +104,9 @@ class Container(object):
 
         net_id = None
         for network in dckr.networks(names=[dckr_net_name]):
+            if network['Name'] != dckr_net_name:
+                continue
+
             net_id = network['Id']
             if not 'IPAM' in network:
                 print('can\'t verify if container\'s IP addresses '
