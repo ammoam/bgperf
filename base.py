@@ -17,11 +17,10 @@ from settings import dckr
 import io
 import os
 import yaml
-from pyroute2 import IPRoute
 from itertools import chain
-from nsenter import Namespace
 from threading import Thread
 import netaddr
+import sys
 
 flatten = lambda l: chain.from_iterable(l)
 
@@ -108,32 +107,34 @@ class Container(object):
             net_id = network['Id']
             if not 'IPAM' in network:
                 print('can\'t verify if container\'s IP addresses '
-                      'are valid for network {}: missing IPAM'.format(brname))
+                      'are valid for Docker network {}: missing IPAM'.format(brname))
                 break
             ipam = network['IPAM']
 
             if not 'Config' in ipam:
                 print('can\'t verify if container\'s IP addresses '
-                      'are valid for network {}: missing IPAM.Config'.format(brname))
+                      'are valid for Docker network {}: missing IPAM.Config'.format(brname))
                 break
 
             ip_ok = False
+            network_subnets = [item['Subnet'] for item in ipam['Config'] if 'Subnet' in item]
             for ip in ipv4_addresses:
-                for item in ipam['Config']:
-                    if not 'Subnet' in item:
-                        continue
-                    subnet = item['Subnet']
+                for subnet in network_subnets:
                     ip_ok = netaddr.IPAddress(ip) in netaddr.IPNetwork(subnet)
+
                 if not ip_ok:
-                    raise Exception('the container\'s IP address {} is not valid for network {} '
-                                    'since it\'s not part of any of its subnets'.format(
-                                        ip, brname
-                                    )
-                                )
+                    print('the container\'s IP address {} is not valid for Docker network {} '
+                          'since it\'s not part of any of its subnets ({})'.format(
+                              ip, brname, ', '.join(network_subnets)))
+                    print('Please consider removing the Docket network {net} '
+                          'to allow bgperf to create it again using the '
+                          'expected subnet:\n'
+                          '  docker network rm {net}'.format(net=brname))
+                    sys.exit(1)
             break
 
         if net_id is None:
-            print 'network "{}" not found!'.format(brname)
+            print 'Docker network "{}" not found!'.format(brname)
             return
 
         dckr.connect_container_to_network(self.ctn_id, net_id, ipv4_address=ipv4_addresses[0])

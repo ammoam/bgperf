@@ -112,17 +112,6 @@ def bench(args):
     config_dir = '{0}/{1}'.format(args.dir, args.bench_name)
     brname = args.bridge_name or args.bench_name + '-br'
 
-    bridge_found = False
-    for network in dckr.networks(names=[brname]):
-        print 'network "{}" already exists'.format(brname)
-        bridge_found = True
-        break
-    if not bridge_found:
-        subnet = args.local_address_prefix
-        print 'creating network "{}" with subnet {}'.format(brname, subnet)
-        ipam = IPAMConfig(pool_configs=[IPAMPool(subnet=subnet)])
-        network = dckr.create_network(brname, driver='bridge', ipam=ipam)
-
     ip = IPRoute()
     ctn_intfs = flatten((l.get_attr('IFLA_IFNAME') for l in ip.get_links() if l.get_attr('IFLA_MASTER') == br) for br in ip.link_lookup(ifname=brname))
 
@@ -149,6 +138,18 @@ def bench(args):
         with open('{0}/scenario.yaml'.format(config_dir), 'w') as f:
             f.write(conf)
         conf = yaml.load(Template(conf).render())
+
+    bridge_found = False
+    for network in dckr.networks(names=[brname]):
+        if network['Name'] == brname:
+            print 'network "{}" already exists'.format(brname)
+            bridge_found = True
+            break
+    if not bridge_found:
+        subnet = conf['local_prefix']
+        print 'creating network "{}" with subnet {}'.format(brname, subnet)
+        ipam = IPAMConfig(pool_configs=[IPAMPool(subnet=subnet)])
+        network = dckr.create_network(brname, driver='bridge', ipam=ipam)
 
     num_tester = sum(len(t.get('tester', [])) for t in conf.get('testers', []))
     if num_tester > gc_thresh3():
@@ -298,6 +299,7 @@ def gen_conf(args):
         monitor_router_id = monitor_local_address
 
     conf = {}
+    conf['local_prefix'] = str(local_address_prefix)
     conf['target'] = {
         'as': 1000,
         'router-id': str(target_router_id),
