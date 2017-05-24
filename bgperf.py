@@ -110,23 +110,11 @@ def update(args):
 
 def bench(args):
     config_dir = '{0}/{1}'.format(args.dir, args.bench_name)
-    brname = args.bridge_name or args.bench_name + '-br'
-
-    ip = IPRoute()
-    ctn_intfs = flatten((l.get_attr('IFLA_IFNAME') for l in ip.get_links() if l.get_attr('IFLA_MASTER') == br) for br in ip.link_lookup(ifname=brname))
+    dckr_net_name = args.docker_network_name or args.bench_name + '-br'
 
     if not args.repeat:
-        # currently ctn name is same as ctn intf
-        # TODO support proper mapping between ctn name and intf name
-        for ctn in ctn_intfs:
-            dckr.remove_container(ctn, force=True) if ctn_exists(ctn) else None
-
         if os.path.exists(config_dir):
             shutil.rmtree(config_dir)
-    else:
-        for ctn in ctn_intfs:
-            if ctn != 'tester':
-                dckr.remove_container(ctn, force=True) if ctn_exists(ctn) else None
 
     if args.file:
         with open(args.file) as f:
@@ -140,16 +128,16 @@ def bench(args):
         conf = yaml.load(Template(conf).render())
 
     bridge_found = False
-    for network in dckr.networks(names=[brname]):
-        if network['Name'] == brname:
-            print 'network "{}" already exists'.format(brname)
+    for network in dckr.networks(names=[dckr_net_name]):
+        if network['Name'] == dckr_net_name:
+            print 'Docker network "{}" already exists'.format(dckr_net_name)
             bridge_found = True
             break
     if not bridge_found:
         subnet = conf['local_prefix']
-        print 'creating network "{}" with subnet {}'.format(brname, subnet)
+        print 'creating Docker network "{}" with subnet {}'.format(dckr_net_name, subnet)
         ipam = IPAMConfig(pool_configs=[IPAMPool(subnet=subnet)])
-        network = dckr.create_network(brname, driver='bridge', ipam=ipam)
+        network = dckr.create_network(dckr_net_name, driver='bridge', ipam=ipam)
 
     num_tester = sum(len(t.get('tester', [])) for t in conf.get('testers', []))
     if num_tester > gc_thresh3():
@@ -157,42 +145,117 @@ def bench(args):
         print 'type next to increase the value'
         print '$ echo 16384 | sudo tee /proc/sys/net/ipv4/neigh/default/gc_thresh3'
 
-    if args.target == 'gobgp':
-        target_class = GoBGP
-    elif args.target == 'bird':
-        target_class = BIRD
-    elif args.target == 'quagga':
-        target_class = Quagga
+    print 'run monitor'
+    m = Monitor('monitor', config_dir+'/monitor', conf['monitor'])
+    m.run(conf, dckr_net_name)
 
     is_remote = True if 'remote' in conf['target'] and conf['target']['remote'] else False
 
     if is_remote:
+        print 'target is remote ({})'.format(conf['target']['local-address'])
+
+        ip = IPRoute()
+
+        # r: route to the target
         r = ip.get_routes(dst=conf['target']['local-address'], family=AF_INET)
         if len(r) == 0:
             print 'no route to remote target {0}'.format(conf['target']['local-address'])
             sys.exit(1)
 
+        # intf: interface used to reach the target
         idx = [t[1] for t in r[0]['attrs'] if t[0] == 'RTA_OIF'][0]
         intf = ip.get_links(idx)[0]
+        intf_name = intf.get_attr('IFLA_IFNAME')
 
-        if intf.get_attr('IFLA_MASTER') not in ip.link_lookup(ifname=brname):
-            br = ip.link_lookup(ifname=brname)
-            if len(br) == 0:
-                ip.link_create(ifname=brname, kind='bridge')
-                br = ip.link_lookup(ifname=brname)
-            br = br[0]
-            ip.link('set', index=idx, master=br)
+        # raw_bridge_name: Linux bridge name of the Docker bridge
+        # TODO: not sure if the linux bridge name is always given by
+        #       "br-<first 12 characters of Docker network ID>".
+        raw_bridge_name = args.bridge_name or 'br-{}'.format(network['Id'][0:12])
+
+        # raw_bridges: list of Linux bridges that match raw_bridge_name
+        raw_bridges = ip.link_lookup(ifname=raw_bridge_name)
+        if len(raw_bridges) == 0:
+            if not args.bridge_name:
+                print('can\'t determine the Linux bridge interface name starting '
+                      'from the Docker network {}'.format(dckr_net_name))
+            else:
+                print('the Linux bridge name provided ({}) seems nonexistent'.format(
+                      raw_bridge_name))
+            print('Since the target is remote, the host interface used to '
+                    'reach the target ({}) must be part of the Linux bridge '
+                    'used by the Docker network {}, but without the correct Linux '
+                    'bridge name it\'s impossible to verify if that\'s true'.format(
+                        intf_name, dckr_net_name))
+            if not args.bridge_name:
+                print('Please supply the Linux bridge name corresponding to the '
+                      'Docker network {} using the --bridge-name argument.'.format(
+                          dckr_net_name))
+            sys.exit(1)
+
+        # intf_bridge: bridge interface that intf is already member of
+        intf_bridge = intf.get_attr('IFLA_MASTER')
+
+        # if intf is not member of the bridge, add it
+        if intf_bridge not in raw_bridges:
+            if intf_bridge is None:
+                print('Since the target is remote, the host interface used to '
+                      'reach the target ({}) must be part of the Linux bridge '
+                      'used by the Docker network {}'.format(
+                          intf_name, dckr_net_name))
+                sys.stdout.write('Do you confirm to add the interface {} '
+                                 'to the bridge {}? [yes/NO] '.format(
+                                     intf_name, raw_bridge_name
+                                    ))
+                try:
+                    answer = raw_input()
+                except:
+                    print 'aborting'
+                    sys.exit(1)
+                answer = answer.strip()
+                if answer.lower() != 'yes':
+                    print 'aborting'
+                    sys.exit(1)
+
+                print 'adding interface {} to the bridge {}'.format(
+                    intf_name, raw_bridge_name
+                )
+                br = raw_bridges[0]
+
+                try:
+                    ip.link('set', index=idx, master=br)
+                except Exception as e:
+                    print('Something went wrong: {}'.format(str(e)))
+                    print('Please consider running the following command to '
+                          'add the {iface} interface to the {br} bridge:\n'
+                          '   sudo brctl addif {br} {iface}'.format(
+                              iface=intf_name, br=raw_bridge_name))
+                    print('\n\n\n')
+                    raise
+            else:
+                curr_bridge_name = ip.get_links(intf_bridge)[0].get_attr('IFLA_IFNAME')
+                print('the interface used to reach the target ({}) '
+                      'is already member of the bridge {}, which is not '
+                      'the one used in this configuration'.format(
+                          intf_name, curr_bridge_name))
+                print('Please consider running the following command to '
+                        'remove the {iface} interface from the {br} bridge:\n'
+                        '   sudo brctl addif {br} {iface}'.format(
+                            iface=intf_name, br=curr_bridge_name))
+                sys.exit(1)
     else:
+        if args.target == 'gobgp':
+            target_class = GoBGP
+        elif args.target == 'bird':
+            target_class = BIRD
+        elif args.target == 'quagga':
+            target_class = Quagga
+
         print 'run', args.target
         if args.image:
             target = target_class(args.target, '{0}/{1}'.format(config_dir, args.target), conf['target'], image=args.image)
         else:
-            target = target(args.target, '{0}/{1}'.format(config_dir, args.target), conf['target'])
-        target.run(conf, brname)
-
-    print 'run monitor'
-    m = Monitor('monitor', config_dir+'/monitor', conf['monitor'])
-    m.run(conf, brname)
+            target = target_class(args.target, '{0}/{1}'.format(config_dir, args.target), conf['target'])
+        target.run(conf, dckr_net_name)
 
     time.sleep(1)
 
@@ -217,7 +280,7 @@ def bench(args):
             else:
                 print 'invalid tester type:', tester_type
                 sys.exit(1)
-            t.run(tester, conf['target'], brname)
+            t.run(tester, conf['target'], dckr_net_name)
 
     start = datetime.datetime.now()
 
@@ -447,7 +510,13 @@ if __name__ == '__main__':
     parser_bench = s.add_parser('bench', help='run benchmarks')
     parser_bench.add_argument('-t', '--target', choices=['gobgp', 'bird', 'quagga'], default='gobgp')
     parser_bench.add_argument('-i', '--image', help='specify custom docker image')
-    parser_bench.add_argument('--bridge-name', help='Docker bridge name; this is the name given by \'docker network ls\'')
+    parser_bench.add_argument('--docker-network-name', help='Docker network name; this is the name given by \'docker network ls\'')
+    parser_bench.add_argument('--bridge-name', help='Linux bridge name of the '
+                              'interface corresponding to the Docker network; '
+                              'use this argument only if bgperf can\'t '
+                              'determine the Linux bridge name starting from '
+                              'the Docker network name in case of tests of '
+                              'remote targets.')
     parser_bench.add_argument('-r', '--repeat', action='store_true', help='use existing tester/monitor container')
     parser_bench.add_argument('-f', '--file', metavar='CONFIG_FILE')
     parser_bench.add_argument('-g', '--cooling', default=0, type=int)
