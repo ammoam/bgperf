@@ -7,6 +7,7 @@ add `remote: true` to the `target` configuration.
 
 ```shell
 $ cat scenario.yaml
+local_prefix: 192.168.10.0/24
 monitor:
   as: 1001
   check-points: [20]

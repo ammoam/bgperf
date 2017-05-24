@@ -2,8 +2,8 @@
 
 ![architecture of bgperf](./bgperf.jpg)
 
-When `bench` command issued, `bgperf` boots three docker containers,
-`target`, `tester` and `monitor` and connect them via a bridge `bgperf-br`.
+When `bench` command issued, `bgperf` boots three (or more) docker containers,
+`target`, `monitor` and one or more `tester` and connect them via a bridge (`bgperf-br` by default).
 
 By default, `bgperf` stores all configuration files and log files under `/tmp/bgperf`.
 Here is what you can see after issuing `bgperf.py bench -n 10`.
@@ -60,6 +60,7 @@ $ cat /tmp/bgperf/scenario.yaml
     def gen_paths(num):
         return list('{0}/32'.format(ip) for ip in islice(it, num))
 %>
+local_prefix: 10.10.0.0/24
 monitor:
   as: 1001
   check-points: [1000]
@@ -93,7 +94,7 @@ testers:
 ...(snip)...
 ```
 
-It describes local address, as number and router-id of each cast.
+It describes local address, AS number and router-id of each cast.
 With regard to tester, it also describes the routes to advertise to the target.
 
 `check-points` field of `monitor` control when to end the benchmark.

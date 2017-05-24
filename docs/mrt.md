@@ -22,6 +22,7 @@ $ cat /tmp/bgperf/scenario.yaml
     def gen_paths(num):
         return list('{0}/32'.format(ip) for ip in islice(it, num))
 %>
+local_prefix: 10.10.0.0/24
 monitor:
   as: 1001
   check-points: [1000]
