@@ -98,8 +98,8 @@ neighbor {0} timers 30 90
 
         self.config_name = name
 
-    def run(self, conf, brname=''):
-        ctn = super(Quagga, self).run(brname)
+    def run(self, conf, dckr_net_name=''):
+        ctn = super(Quagga, self).run(dckr_net_name)
 
         if self.config_name == None:
             self.write_config(conf)

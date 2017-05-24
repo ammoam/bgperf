@@ -29,8 +29,8 @@ class Tester(ExaBGP):
             res.append(p['local-address'])
         return res
 
-    def run(self, conf, target, brname=''):
-        super(Tester, self).run(brname)
+    def run(self, conf, target, dckr_net_name=''):
+        super(Tester, self).run(dckr_net_name)
 
         startup = ['''#!/bin/bash
 ulimit -n 65536''']

@@ -111,8 +111,8 @@ RUN go install github.com/osrg/gobgp/gobgp
             f.write(yaml.dump(config, default_flow_style=False))
         self.config_name = name
 
-    def run(self, conf, brname=''):
-        ctn = super(GoBGP, self).run(brname)
+    def run(self, conf, dckr_net_name=''):
+        ctn = super(GoBGP, self).run(dckr_net_name)
 
         if self.config_name == None:
             self.write_config(conf)

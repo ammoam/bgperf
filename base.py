@@ -84,7 +84,7 @@ class Container(object):
             return [local_addr]
         raise NotImplementedError()
 
-    def run(self, brname='', rm=True):
+    def run(self, dckr_net_name='', rm=True):
 
         if rm and ctn_exists(self.name):
             print 'remove container:', self.name
@@ -103,17 +103,17 @@ class Container(object):
         ipv4_addresses = self.get_ipv4_addresses()
 
         net_id = None
-        for network in dckr.networks(names=[brname]):
+        for network in dckr.networks(names=[dckr_net_name]):
             net_id = network['Id']
             if not 'IPAM' in network:
                 print('can\'t verify if container\'s IP addresses '
-                      'are valid for Docker network {}: missing IPAM'.format(brname))
+                      'are valid for Docker network {}: missing IPAM'.format(dckr_net_name))
                 break
             ipam = network['IPAM']
 
             if not 'Config' in ipam:
                 print('can\'t verify if container\'s IP addresses '
-                      'are valid for Docker network {}: missing IPAM.Config'.format(brname))
+                      'are valid for Docker network {}: missing IPAM.Config'.format(dckr_net_name))
                 break
 
             ip_ok = False
@@ -125,16 +125,16 @@ class Container(object):
                 if not ip_ok:
                     print('the container\'s IP address {} is not valid for Docker network {} '
                           'since it\'s not part of any of its subnets ({})'.format(
-                              ip, brname, ', '.join(network_subnets)))
+                              ip, dckr_net_name, ', '.join(network_subnets)))
                     print('Please consider removing the Docket network {net} '
                           'to allow bgperf to create it again using the '
                           'expected subnet:\n'
-                          '  docker network rm {net}'.format(net=brname))
+                          '  docker network rm {net}'.format(net=dckr_net_name))
                     sys.exit(1)
             break
 
         if net_id is None:
-            print 'Docker network "{}" not found!'.format(brname)
+            print 'Docker network "{}" not found!'.format(dckr_net_name)
             return
 
         dckr.connect_container_to_network(self.ctn_id, net_id, ipv4_address=ipv4_addresses[0])
