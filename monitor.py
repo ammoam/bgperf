@@ -52,10 +52,6 @@ gobgpd -t yaml -f {1}/{2} -l {3} > {1}/gobgpd.log 2>&1
         self.config = conf
         return ctn
 
-    def local(self, cmd, stream=False):
-        i = dckr.exec_create(container=self.name, cmd=cmd)
-        return dckr.exec_start(i['Id'], stream=stream)
-
     def wait_established(self, neighbor):
         while True:
             neigh = json.loads(self.local('gobgp neighbor {0} -j'.format(neighbor)))

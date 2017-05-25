@@ -147,8 +147,7 @@ class Container(object):
 
             # get the interface used by the first IP address already added by Docker
             dev = None
-            exec_cmd = dckr.exec_create(self.ctn_id, 'ip addr', privileged=True)
-            res = dckr.exec_start(exec_cmd['Id'])
+            res = self.local('ip addr')
             for line in res.split('\n'):
                 if ipv4_addresses[0] in line:
                     dev = line.split(' ')[-1].strip()
@@ -156,9 +155,7 @@ class Container(object):
                 dev = "eth0"
 
             for ip in ipv4_addresses[1:]:
-                exec_cmd = dckr.exec_create(self.ctn_id, "ip addr add {} dev {}".format(ip, dev),
-                                            privileged=True)
-                dckr.exec_start(exec_cmd['Id'])
+                self.local('ip addr add {} dev {}'.format(ip, dev))
 
         return ctn
 
@@ -183,3 +180,7 @@ class Container(object):
         t = Thread(target=stats)
         t.daemon = True
         t.start()
+
+    def local(self, cmd, stream=False):
+        i = dckr.exec_create(container=self.name, cmd=cmd)
+        return dckr.exec_start(i['Id'], stream=stream)
