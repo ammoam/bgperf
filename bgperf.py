@@ -30,8 +30,8 @@ from socket import AF_INET
 from nsenter import Namespace
 from base import *
 from exabgp import ExaBGP
-from gobgp import GoBGP
-from bird import BIRD
+from gobgp import GoBGP, GoBGPTarget
+from bird import BIRD, BIRDTarget
 from quagga import Quagga
 from tester import Tester
 from mrt_tester import MRTTester
@@ -244,9 +244,9 @@ def bench(args):
                 sys.exit(1)
     else:
         if args.target == 'gobgp':
-            target_class = GoBGP
+            target_class = GoBGPTarget
         elif args.target == 'bird':
-            target_class = BIRD
+            target_class = BIRDTarget
         elif args.target == 'quagga':
             target_class = Quagga
 

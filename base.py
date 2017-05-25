@@ -44,15 +44,6 @@ class Container(object):
             os.makedirs(host_dir)
             os.chmod(host_dir, 0777)
 
-    def use_existing_config(self, name):
-        if 'config_path' in self.conf:
-            with open('{0}/{1}'.format(self.host_dir, name), 'w') as f:
-                with open(self.conf['config_path'], 'r') as orig:
-                    f.write(orig.read())
-            self.config_name = name
-            return True
-        return False
-
     @classmethod
     def build_image(cls, force, tag, nocache=False):
         def insert_after_from(dockerfile, line):
@@ -184,3 +175,39 @@ class Container(object):
     def local(self, cmd, stream=False):
         i = dckr.exec_create(container=self.name, cmd=cmd)
         return dckr.exec_start(i['Id'], stream=stream)
+
+
+class Target(Container):
+
+    CONFIG_FILE_NAME = None
+
+    def write_config(self, scenario_global_conf):
+        raise NotImplementedError()
+
+    def use_existing_config(self):
+        if 'config_path' in self.conf:
+            with open('{0}/{1}'.format(self.host_dir, self.CONFIG_FILE_NAME), 'w') as f:
+                with open(self.conf['config_path'], 'r') as orig:
+                    f.write(orig.read())
+            return True
+        return False
+
+    def get_startup_cmd(self):
+        raise NotImplementedError()
+
+    def run(self, scenario_global_conf, dckr_net_name=''):
+        ctn = super(Target, self).run(dckr_net_name)
+
+        if not self.use_existing_config():
+            self.write_config(scenario_global_conf)
+
+        startup_content = self.get_startup_cmd()
+
+        filename = '{0}/start.sh'.format(self.host_dir)
+        with open(filename, 'w') as f:
+            f.write(startup_content)
+        os.chmod(filename, 0777)
+
+        i = dckr.exec_create(container=self.name, cmd='{0}/start.sh'.format(self.guest_dir))
+        dckr.exec_start(i['Id'], detach=True, socket=True)
+        return ctn
