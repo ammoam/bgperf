@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from base import Tester
 from exabgp import ExaBGP
 import os
 from  settings import dckr
@@ -21,14 +22,12 @@ def rm_line():
     print '\x1b[1A\x1b[2K\x1b[1D\x1b[1A'
 
 
-class ExaBGPTester(ExaBGP):
+class ExaBGPTester(Tester, ExaBGP):
 
-    def get_ipv4_addresses(self):
-        res = []
-        peers = self.conf.get('neighbors', {}).values()
-        for p in peers:
-            res.append(p['local-address'])
-        return res
+    CONTAINER_NAME_PREFIX = 'bgperf_exabgp_tester_'
+
+    def __init__(self, name, host_dir, conf, image='bgperf/exabgp'):
+        super(ExaBGPTester, self).__init__(name, host_dir, conf, image)
 
     def run(self, target_conf, dckr_net_name=''):
         super(ExaBGPTester, self).run(dckr_net_name)

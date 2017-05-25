@@ -16,8 +16,12 @@
 from base import *
 
 class Quagga(Container):
-    def __init__(self, name, host_dir, conf, guest_dir='/root/config', image='bgperf/quagga'):
-        super(Quagga, self).__init__(name, image, host_dir, guest_dir, conf)
+
+    CONTAINER_NAME = None
+    GUEST_DIR = '/root/config'
+
+    def __init__(self, host_dir, conf, image='bgperf/quagga'):
+        super(Quagga, self).__init__(self.CONTAINER_NAME, image, host_dir, self.GUEST_DIR, conf)
 
     @classmethod
     def build_image(cls, force=False, tag='bgperf/quagga', checkout='HEAD', nocache=False):
@@ -38,6 +42,7 @@ RUN ldconfig
 
 class QuaggaTarget(Quagga, Target):
 
+    CONTAINER_NAME = 'bgperf_quagga_target'
     CONFIG_FILE_NAME = 'bgpd.conf'
 
     def write_config(self, scenario_global_conf):

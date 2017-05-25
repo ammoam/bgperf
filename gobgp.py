@@ -16,8 +16,12 @@
 from base import *
 
 class GoBGP(Container):
-    def __init__(self, name, host_dir, conf, guest_dir='/root/config', image='bgperf/gobgp'):
-        super(GoBGP, self).__init__(name, image, host_dir, guest_dir, conf)
+
+    CONTAINER_NAME = None
+    GUEST_DIR = '/root/config'
+
+    def __init__(self, host_dir, conf, image='bgperf/gobgp'):
+        super(GoBGP, self).__init__(self.CONTAINER_NAME, image, host_dir, self.GUEST_DIR, conf)
 
     @classmethod
     def build_image(cls, force=False, tag='bgperf/gobgp', checkout='HEAD', nocache=False):
@@ -35,6 +39,7 @@ RUN go install github.com/osrg/gobgp/gobgp
 
 class GoBGPTarget(GoBGP, Target):
 
+    CONTAINER_NAME = 'bgperf_gobgp_target'
     CONFIG_FILE_NAME = 'gobgpd.conf'
 
     def write_config(self, scenario_global_conf):

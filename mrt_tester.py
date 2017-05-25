@@ -13,13 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from base import Tester
 from gobgp import GoBGP
 import os
 import yaml
 from  settings import dckr
 import shutil
 
-class GoBGPMRTTester(GoBGP):
+class GoBGPMRTTester(Tester, GoBGP):
+
+    CONTAINER_NAME_PREFIX = 'bgperf_gobgp_mrttester_'
+
+    def __init__(self, name, host_dir, conf, image='bgperf/gobgp'):
+        super(GoBGPMRTTester, self).__init__(name, host_dir, conf, image)
 
     def run(self, target_conf, dckr_net_name=''):
         ctn = super(GoBGPMRTTester, self).run(dckr_net_name)

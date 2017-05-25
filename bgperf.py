@@ -32,7 +32,7 @@ from base import *
 from exabgp import ExaBGP
 from gobgp import GoBGP, GoBGPTarget
 from bird import BIRD, BIRDTarget
-from quagga import Quagga
+from quagga import Quagga, QuaggaTarget
 from tester import ExaBGPTester
 from mrt_tester import GoBGPMRTTester
 from monitor import Monitor
@@ -112,7 +112,22 @@ def bench(args):
     config_dir = '{0}/{1}'.format(args.dir, args.bench_name)
     dckr_net_name = args.docker_network_name or args.bench_name + '-br'
 
+    for target_class in [BIRDTarget, GoBGPTarget, QuaggaTarget]:
+        if ctn_exists(target_class.CONTAINER_NAME):
+            print 'removing target container', target_class.CONTAINER_NAME
+            dckr.remove_container(target_class.CONTAINER_NAME, force=True)
+
     if not args.repeat:
+        if ctn_exists(Monitor.CONTAINER_NAME):
+            print 'removing monitor container', Monitor.CONTAINER_NAME
+            dckr.remove_container(Monitor.CONTAINER_NAME, force=True)
+
+        for ctn_name in get_ctn_names():
+            if ctn_name.startswith(ExaBGPTester.CONTAINER_NAME_PREFIX) or \
+                ctn_name.startswith(GoBGPMRTTester.CONTAINER_NAME_PREFIX):
+                print 'removing tester container', ctn_name
+                dckr.remove_container(ctn_name, force=True)
+
         if os.path.exists(config_dir):
             shutil.rmtree(config_dir)
 
@@ -146,7 +161,7 @@ def bench(args):
         print '$ echo 16384 | sudo tee /proc/sys/net/ipv4/neigh/default/gc_thresh3'
 
     print 'run monitor'
-    m = Monitor('monitor', config_dir+'/monitor', conf['monitor'])
+    m = Monitor(config_dir+'/monitor', conf['monitor'])
     m.run(conf, dckr_net_name)
 
     is_remote = True if 'remote' in conf['target'] and conf['target']['remote'] else False
@@ -248,13 +263,13 @@ def bench(args):
         elif args.target == 'bird':
             target_class = BIRDTarget
         elif args.target == 'quagga':
-            target_class = Quagga
+            target_class = QuaggaTarget
 
         print 'run', args.target
         if args.image:
-            target = target_class(args.target, '{0}/{1}'.format(config_dir, args.target), conf['target'], image=args.image)
+            target = target_class('{0}/{1}'.format(config_dir, args.target), conf['target'], image=args.image)
         else:
-            target = target_class(args.target, '{0}/{1}'.format(config_dir, args.target), conf['target'])
+            target = target_class('{0}/{1}'.format(config_dir, args.target), conf['target'])
         target.run(conf, dckr_net_name)
 
     time.sleep(1)

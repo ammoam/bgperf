@@ -16,8 +16,12 @@
 from base import *
 
 class BIRD(Container):
-    def __init__(self, name, host_dir, conf, guest_dir='/root/config', image='bgperf/bird'):
-        super(BIRD, self).__init__(name, image, host_dir, guest_dir, conf)
+
+    CONTAINER_NAME = None
+    GUEST_DIR = '/root/config'
+
+    def __init__(self, host_dir, conf, image='bgperf/bird'):
+        super(BIRD, self).__init__(self.CONTAINER_NAME, image, host_dir, self.GUEST_DIR, conf)
 
     @classmethod
     def build_image(cls, force=False, tag='bgperf/bird', checkout='HEAD', nocache=False):
@@ -35,6 +39,7 @@ RUN git clone https://gitlab.labs.nic.cz/labs/bird.git bird && \
 
 class BIRDTarget(BIRD, Target):
 
+    CONTAINER_NAME = 'bgperf_bird_target'
     CONFIG_FILE_NAME = 'bird.conf'
 
     def write_config(self, scenario_global_conf):

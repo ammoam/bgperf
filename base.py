@@ -24,8 +24,13 @@ import sys
 
 flatten = lambda l: chain.from_iterable(l)
 
+def get_ctn_names():
+    names = list(flatten(n['Names'] for n in dckr.containers(all=True)))
+    return [n[1:] if n[0] == '/' else n for n in names]
+
+
 def ctn_exists(name):
-    return '/{0}'.format(name) in list(flatten(n['Names'] for n in dckr.containers(all=True)))
+    return name in get_ctn_names()
 
 
 def img_exists(name):
@@ -87,6 +92,7 @@ class Container(object):
             network_mode='bridge',
             cap_add=['NET_ADMIN']
         )
+
         ctn = dckr.create_container(image=self.image, entrypoint='bash', detach=True, name=self.name,
                                     stdin_open=True, volumes=[self.guest_dir], host_config=host_config)
         self.ctn_id = ctn['Id']
@@ -211,3 +217,18 @@ class Target(Container):
         i = dckr.exec_create(container=self.name, cmd='{0}/start.sh'.format(self.guest_dir))
         dckr.exec_start(i['Id'], detach=True, socket=True)
         return ctn
+
+
+class Tester(Container):
+
+    CONTAINER_NAME_PREFIX = None
+
+    def __init__(self, name, host_dir, conf, image):
+        Container.__init__(self, self.CONTAINER_NAME_PREFIX + name, image, host_dir, self.GUEST_DIR, conf)
+
+    def get_ipv4_addresses(self):
+        res = []
+        peers = self.conf.get('neighbors', {}).values()
+        for p in peers:
+            res.append(p['local-address'])
+        return res
