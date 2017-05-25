@@ -21,21 +21,22 @@ def rm_line():
     print '\x1b[1A\x1b[2K\x1b[1D\x1b[1A'
 
 
-class Tester(ExaBGP):
+class ExaBGPTester(ExaBGP):
+
     def get_ipv4_addresses(self):
         res = []
-        peers = self.conf.get('tester', {}).values()
+        peers = self.conf.get('neighbors', {}).values()
         for p in peers:
             res.append(p['local-address'])
         return res
 
-    def run(self, conf, target, dckr_net_name=''):
-        super(Tester, self).run(dckr_net_name)
+    def run(self, target_conf, dckr_net_name=''):
+        super(ExaBGPTester, self).run(dckr_net_name)
 
         startup = ['''#!/bin/bash
 ulimit -n 65536''']
 
-        peers = conf.get('tester', {}).values()
+        peers = self.conf.get('neighbors', {}).values()
 
         for p in peers:
             with open('{0}/{1}.conf'.format(self.host_dir, p['router-id']), 'w') as f:
@@ -46,7 +47,7 @@ ulimit -n 65536''']
     local-address {3};
     local-as {4};
     static {{
-'''.format(target['local-address'], target['as'],
+'''.format(target_conf['local-address'], target_conf['as'],
                p['router-id'], local_address, p['as'])
                 f.write(config)
                 for path in p['paths']:
@@ -70,4 +71,4 @@ exabgp {0}/{1}.conf'''.format(self.guest_dir, p['router-id']))
                     if cnt % 2 == 1:
                         if cnt > 1:
                             rm_line()
-                        print 'tester booting.. ({0}/{1})'.format(cnt/2 + 1, len(conf.get('tester', {}).values()))
+                        print 'tester booting.. ({0}/{1})'.format(cnt/2 + 1, len(self.conf.get('neighbors', {}).values()))

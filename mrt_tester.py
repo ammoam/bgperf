@@ -19,12 +19,12 @@ import yaml
 from  settings import dckr
 import shutil
 
-class MRTTester(GoBGP):
+class GoBGPMRTTester(GoBGP):
 
-    def run(self, conf, target, dckr_net_name=''):
-        ctn = super(GoBGP, self).run(dckr_net_name)
+    def run(self, target_conf, dckr_net_name=''):
+        ctn = super(GoBGPMRTTester, self).run(dckr_net_name)
 
-        conf = conf['tester'].values()[0]
+        conf = self.conf.get('neighbors', {}).values()[0]
 
         config = {
             'global': {
@@ -65,8 +65,8 @@ gobgpd -t yaml -f {1}/{2} -l {3} > {1}/gobgpd.log 2>&1
 
         config['neighbors'] = [{
             'config': {
-                'neighbor-address': target['local-address'],
-                'peer-as': target['as'],
+                'neighbor-address': target_conf['local-address'],
+                'peer-as': target_conf['as'],
             },
         }]
 

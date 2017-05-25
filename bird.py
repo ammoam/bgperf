@@ -156,7 +156,7 @@ return true;
                         match_info.append((match['type'], n))
                     f.write(gen_filter(k, match_info))
 
-            for n in sorted(list(flatten(t.get('tester', {}).values() for t in scenario_global_conf['testers'])) + [scenario_global_conf['monitor']], key=lambda n: n['as']):
+            for n in sorted(list(flatten(t.get('neighbors', {}).values() for t in scenario_global_conf['testers'])) + [scenario_global_conf['monitor']], key=lambda n: n['as']):
                 f.write(gen_neighbor_config(n))
             f.flush()
 

@@ -62,7 +62,7 @@ neighbor {0} timers 30 90
 
         with open('{0}/{1}'.format(self.host_dir, self.CONFIG_FILE_NAME), 'w') as f:
             f.write(config)
-            for n in scenario_global_conf['tester'].values() + [scenario_global_conf['monitor']]:
+            for n in list(flatten(t.get('neighbors', {}).values() for t in scenario_global_conf['testers'])) + [scenario_global_conf['monitor']]:
                 f.write(gen_neighbor_config(n))
 
             if 'policy' in scenario_global_conf:
